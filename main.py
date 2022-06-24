@@ -6,8 +6,9 @@ import pypfopt
 from pypfopt import expected_returns
 from pypfopt import EfficientFrontier
 from pypfopt import risk_models
-from cvxpy import SCS
-
+import seaborn as sn
+import matplotlib.pyplot as plt
+st.set_option('deprecation.showPyplotGlobalUse', False)
 st.header('Portfolio')
 default = 'SPY,AAPL,TSLA'
 stocks = st.text_input('Enter up to 10 tickers seperated by commas')
@@ -17,7 +18,7 @@ stocks = stocks.upper()
 
 
 def app(stocks):
-    mu, cov = get_data(stocks)
+    mu, cov, data = get_data(stocks)
     riskfree = rf()
     short, const = short_position()
     if const == 'No' and short == 'Yes':
@@ -32,19 +33,24 @@ def app(stocks):
         ef(riskfree, mu, cov, constrains_upper=ub)
 
 
+# get stock data, return the expected mean and covariance matrix
 def get_data(stocks):
     st.write(stocks)
     data = yf.download(stocks, start='2020-01-01', end='2021-12-31')
     data2 = data['Adj Close']
+    data2.index = data2.index.strftime('%m/%d/%Y')
     st.dataframe(data2)
     mu = pypfopt.expected_returns.mean_historical_return(data2)
     mu = mu.sort_values(ascending=False)
     st.dataframe(mu)
     cov = pypfopt.risk_models.sample_cov(data2)
     st.dataframe(cov)
-    return mu, cov
+    st.pyplot(fig =plot_returns(data2))
+    st.line_chart(data2)
+    return mu, cov, data2
 
 
+# ask user if they want to short and add constraints
 def short_position():
     short = st.radio('Do you want short positons in your portfolio?', ('Yes', 'No'), index=1)
     const = st.radio('Do you want to add constraints?', ('Yes', 'No'), index=1)
@@ -62,8 +68,9 @@ def constraints(stocks):
             upper_bound.append(
                 st.number_input('Enter maximum weight that a stock can have', value=.30, min_value=min, max_value=1.0,
                                 step=.01))
-            st.write('** To ensure that the sum of weights equals 1 the minimum upper bound weight is 1/ # of stocks which is ',
-                     min)
+            st.write(
+                '** To ensure that the sum of weights equals 1 the minimum upper bound weight is 1/ # of stocks which is ',
+                min)
         lower_bound = []
         with col2:
             st.header('Lower Bound')
@@ -185,11 +192,11 @@ def ef_no_bounds(riskfree, mu, cov, short):
     col4, col5, col6 = st.columns(3)
     with col4:
         x = pd.DataFrame(ef.portfolio_performance(risk_free_rate=riskfree, verbose=True),
-                         index=['Expected Return','Volatility','Sharpe Ratio'])
+                         index=['Expected Return', 'Volatility', 'Sharpe Ratio'])
         st.write(x)
     with col5:
         x = pd.DataFrame(ef2.portfolio_performance(risk_free_rate=riskfree, verbose=True),
-                         index=['Expected Return','Volatility','Sharpe Ratio'])
+                         index=['Expected Return', 'Volatility', 'Sharpe Ratio'])
         st.write(x)
     with col6:
         x = pd.DataFrame(ef3.portfolio_performance(risk_free_rate=riskfree, verbose=True),
@@ -197,8 +204,39 @@ def ef_no_bounds(riskfree, mu, cov, short):
         st.write(x)
 
 
+def plot_returns(data):
+    plt.figure(figsize=(14,7))
+    for c in data.columns.values:
+        sn.lineplot(x = data.index, y = data[c], data = data)
+    plt.legend(loc ='upper left', fontsize = 12)
+    plt.ylabel('Price in $')
+    plt.xticks(data.index)
+
+
+
 
 if len(stocks) > 0:
     app(stocks)
 else:
     app(default)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
