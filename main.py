@@ -1,3 +1,6 @@
+import copy
+import datetime
+
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -5,9 +8,12 @@ import yfinance as yf
 import pypfopt
 from pypfopt import expected_returns
 from pypfopt import EfficientFrontier
+from pypfopt import plotting
+
 from pypfopt import risk_models
 import seaborn as sn
 import matplotlib.pyplot as plt
+
 st.set_option('deprecation.showPyplotGlobalUse', False)
 st.header('Portfolio')
 default = 'SPY,AAPL,TSLA'
@@ -18,13 +24,14 @@ stocks = stocks.upper()
 
 
 def app(stocks):
-    mu, cov, data = get_data(stocks)
+    start, end = get_dates()
+    mu, cov, data = get_data(start, end, stocks)
     riskfree = rf()
     short, const = short_position()
     if const == 'No' and short == 'Yes':
-        ef_no_bounds(riskfree, mu, cov, short)
+        ef_no_bounds(riskfree, mu, cov, short, data)
     elif const == 'No' and short == 'No':
-        ef_no_bounds(riskfree, mu, cov, short)
+        ef_no_bounds(riskfree, mu, cov, short, data)
     elif short == "Yes" and const == 'Yes':
         ub, lb = constraints(stocks)
         ef(riskfree, mu, cov, lb, ub)
@@ -34,19 +41,20 @@ def app(stocks):
 
 
 # get stock data, return the expected mean and covariance matrix
-def get_data(stocks):
+def get_data(start, end, stocks):
     st.write(stocks)
-    data = yf.download(stocks, start='2020-01-01', end='2021-12-31')
+    data = yf.download(stocks, start=start, end=end)
     data2 = data['Adj Close']
     data2.index = data2.index.strftime('%m/%d/%Y')
     st.dataframe(data2)
-    mu = pypfopt.expected_returns.mean_historical_return(data2)
+    mu = expected_returns.mean_historical_return(data2)
     mu = mu.sort_values(ascending=False)
+    st.write('Expected Returns')
     st.dataframe(mu)
-    cov = pypfopt.risk_models.sample_cov(data2)
+    cov = risk_models.sample_cov(data2)
+    st.write('Covariance Matrix')
     st.dataframe(cov)
-    st.pyplot(fig =plot_returns(data2))
-    st.line_chart(data2)
+    st.pyplot(fig=plot_returns(data2))
     return mu, cov, data2
 
 
@@ -63,14 +71,14 @@ def constraints(stocks):
     y = stocks.split(',')
     min = 1 / (len(y))
     with st.form('myform'):
+        st.write(
+            '** To ensure that the sum of weights equals 1 the minimum upper bound weight is 1/ # of stocks which is ',
+            min)
         with col1:
             st.header('Upper Bound')
             upper_bound.append(
-                st.number_input('Enter maximum weight that a stock can have', value=.30, min_value=min, max_value=1.0,
+                st.number_input('Enter maximum weight that a stock can have', value=.40, min_value=min, max_value=1.0,
                                 step=.01))
-            st.write(
-                '** To ensure that the sum of weights equals 1 the minimum upper bound weight is 1/ # of stocks which is ',
-                min)
         lower_bound = []
         with col2:
             st.header('Lower Bound')
@@ -89,11 +97,11 @@ def constraints_no_shorting(stocks):
     y = stocks.split(',')
     min = 1 / (len(y))
     with st.form('myform'):
+        st.write('** To ensure that the sum of weights equals 1 the minimum weight is 1/ # of stocks which is ', min)
         st.header('Upper Bound')
         upper_bound.append(
             st.number_input('Enter maximum weight that a stock can have', value=.50, min_value=min, max_value=1.0,
                             step=.01))
-        st.write('** To ensure that the sum of weights equals 1 the minimum weight is 1/ # of stocks which is ', min)
         # for x in y:
         #     keys.append(x)
         #     lower_bound.append(st.number_input(f'{x}', value=0.0, min_value=0.0, max_value=1.0, step=.01))
@@ -126,6 +134,7 @@ def ef(riskfree, mu, cov, lower_constraints=None, constrains_upper=None):
     ef.add_constraint(lambda y: y <= constrains_upper)
     if lower_constraints is not None:
         ef.add_constraint(lambda z: z >= lower_constraints)
+    g = ef_constraints_plt(mu, cov, riskfree, lower_constraints, constrains_upper)
     sharpe = ef.max_sharpe(risk_free_rate=riskfree)
     clean_weights = ef.clean_weights()
     ef2 = EfficientFrontier(mu, cov, weight_bounds=weight_bounds)
@@ -163,9 +172,10 @@ def ef(riskfree, mu, cov, lower_constraints=None, constrains_upper=None):
         x = pd.DataFrame(ef3.portfolio_performance(risk_free_rate=riskfree, verbose=True),
                          index=['Expected Return', 'Volatility', 'Sharpe Ratio'])
         st.write(x)
+    st.pyplot(g)
 
 
-def ef_no_bounds(riskfree, mu, cov, short):
+def ef_no_bounds(riskfree, mu, cov, short, data):
     if short == "Yes":
         weights = (-1, 1)
     else:
@@ -195,48 +205,95 @@ def ef_no_bounds(riskfree, mu, cov, short):
                          index=['Expected Return', 'Volatility', 'Sharpe Ratio'])
         st.write(x)
     with col5:
-        x = pd.DataFrame(ef2.portfolio_performance(risk_free_rate=riskfree, verbose=True),
+        y = pd.DataFrame(ef2.portfolio_performance(risk_free_rate=riskfree, verbose=True),
                          index=['Expected Return', 'Volatility', 'Sharpe Ratio'])
-        st.write(x)
+        st.write(y)
     with col6:
-        x = pd.DataFrame(ef3.portfolio_performance(risk_free_rate=riskfree, verbose=True),
+        z = pd.DataFrame(ef3.portfolio_performance(risk_free_rate=riskfree, verbose=True),
                          index=['Expected Return', 'Volatility', 'Sharpe Ratio'])
-        st.write(x)
+        st.write(z)
+    g = ef_plt(mu, cov, riskfree, weights)
+    st.pyplot(g)
 
 
 def plot_returns(data):
-    plt.figure(figsize=(14,7))
+    plt.figure(figsize=(14, 7))
     for c in data.columns.values:
-        sn.lineplot(x = data.index, y = data[c], data = data)
-    plt.legend(loc ='upper left', fontsize = 12)
+        sn.lineplot(x=data.index, y=data[c], data=data)
     plt.ylabel('Price in $')
-    plt.xticks(data.index)
 
 
+def get_dates():
+    with st.form('Dates'):
+        start = st.date_input("start date", datetime.date(2020, 1, 1))
+        end = st.date_input("end date", datetime.date(2021, 1, 1))
+        submitted = st.form_submit_button('Submit')
+        if submitted:
+            st.write(start)
+            st.write(end)
+    return start, end
+
+
+def ef_plt(mu, cov, riskfree, weights):
+    ef = EfficientFrontier(mu, cov, weight_bounds=weights)
+    fig, ax = plt.subplots()
+    ef_max_sharpe = copy.deepcopy(ef)
+    plotting.plot_efficient_frontier(ef ,ef_param='utility',ax=ax, show_assets=True,show_tickers=True ,zorder=5)
+
+    # Find the tangency portfolio
+    ef_max_sharpe.max_sharpe(riskfree)
+    ret_tangent, std_tangent, _ = ef_max_sharpe.portfolio_performance()
+    ax.scatter(std_tangent, ret_tangent, marker="*", s=100, c="orange", label="Max Sharpe",zorder=10)
+
+    # Generate random portfolios
+    n_samples = 10000
+    w = np.random.dirichlet(np.ones(ef.n_assets), n_samples)
+    rets = w.dot(ef.expected_returns)
+    stds = np.sqrt(np.diag(w @ ef.cov_matrix @ w.T))
+    sharpes = rets / stds
+    ax.scatter(stds, rets, marker=".", c=sharpes, cmap="cool",zorder=0)
+
+    # Output
+    ax.set_title("Efficient Frontier with random portfolios")
+    ax.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+def ef_constraints_plt(mu, cov, riskfree, lower_constraints=None, constrains_upper=None):
+    if lower_constraints is not None:
+        weight_bounds = (-1, 1)
+    else:
+        weight_bounds = (0, 1)
+    ef = EfficientFrontier(mu, cov, weight_bounds=weight_bounds)
+    ef.add_constraint(lambda y: y <= constrains_upper)
+    if lower_constraints is not None:
+        ef.add_constraint(lambda z: z >= lower_constraints)
+    fig, ax = plt.subplots()
+    ef_max_sharpe = copy.deepcopy(ef)
+    plotting.plot_efficient_frontier(ef, ax=ax, show_assets=False, zorder=5)
+
+    # Find the tangency portfolio
+    ef_max_sharpe.max_sharpe(riskfree)
+    ret_tangent, std_tangent, _ = ef_max_sharpe.portfolio_performance()
+    ax.scatter(std_tangent, ret_tangent, marker="*", s=100, c="orange", label="Max Sharpe", zorder=10)
+
+    # Generate random portfolios
+    n_samples = 10000
+    w = np.random.dirichlet(np.ones(ef.n_assets), n_samples)
+    rets = w.dot(ef.expected_returns)
+    stds = np.sqrt(np.diag(w @ ef.cov_matrix @ w.T))
+    sharpes = rets / stds
+    ax.scatter(stds, rets, marker=".", c=sharpes, cmap="cool", zorder=0)
+
+    # Output
+    ax.set_title("Efficient Frontier with random portfolios")
+    ax.legend()
+    plt.tight_layout()
+    plt.show()
 
 
 if len(stocks) > 0:
     app(stocks)
 else:
     app(default)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
