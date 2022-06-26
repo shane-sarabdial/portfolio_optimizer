@@ -275,7 +275,7 @@ def ef_plt(mu, cov, riskfree, weights):
     ax.scatter(std_tangent, ret_tangent, marker="*", s=100, c="orange", label="Max Sharpe", zorder=10)
 
     # Generate random portfolios
-    n_samples = 15000
+    n_samples = 10000
     w = np.random.dirichlet(np.ones(ef.n_assets), n_samples)
     rets = w.dot(ef.expected_returns)
     stds = np.sqrt(np.diag(w @ ef.cov_matrix @ w.T))
