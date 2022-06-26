@@ -82,7 +82,7 @@ def target():
     return none
 
 
-@st.cache(suppress_st_warning=True)
+
 def constraints(stocks):
     upper_bound = []
     col1, col2 = st.columns(2)
@@ -113,7 +113,6 @@ def constraints(stocks):
     return upper_bound, lower_bound
 
 
-@st.cache(suppress_st_warning=True)
 def constraints_no_shorting(stocks):
     upper_bound = []
     y = stocks.split(',')
@@ -138,7 +137,7 @@ def constraints_no_shorting(stocks):
     return upper_bound
 
 
-@st.cache(suppress_st_warning=True)
+
 def rf():
     st.header('Risk free rate')
     st.write('Enter a risk free rate')
@@ -146,7 +145,7 @@ def rf():
     return rf
 
 
-@st.cache(suppress_st_warning=True)
+
 def ef(riskfree, mu, cov, lower_constraints=None, constrains_upper=None):
     if lower_constraints is not None:
         weight_bounds = (-1, 1)
@@ -202,7 +201,7 @@ def ef(riskfree, mu, cov, lower_constraints=None, constrains_upper=None):
     st.pyplot(g)
 
 
-@st.cache(suppress_st_warning=True)
+
 def ef_no_bounds(riskfree, mu, cov, short, data):
     if short == "Yes":
         weights = (-1, 1)
@@ -244,7 +243,7 @@ def ef_no_bounds(riskfree, mu, cov, short, data):
     st.pyplot(g)
 
 
-@st.cache(suppress_st_warning=True)
+
 def plot_returns(data):
     plt.figure(figsize=(14, 7))
     for c in data.columns.values:
@@ -256,7 +255,7 @@ def plot_returns(data):
     plt.title('Daily Returns', fontsize=20)
 
 
-@st.cache(suppress_st_warning=True)
+
 def plot_returns_change(data):
     plt.figure(figsize=(14, 7))
     data1 = data.pct_change()
