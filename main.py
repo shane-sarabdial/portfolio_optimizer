@@ -16,6 +16,8 @@ import matplotlib.pyplot as plt
 
 st.set_option('deprecation.showPyplotGlobalUse', False)
 st.header('Portfolio')
+st.subheader('Created by Shane Sarabdial')
+st.subheader('Contact : Satramsarabdial12@gmail.com')
 default = 'SPY,AAPL,TSLA'
 stocks = st.text_input('Enter up to 10 tickers seperated by commas')
 if len(stocks.split(sep=',')) > 10:
@@ -24,6 +26,9 @@ stocks = stocks.upper()
 
 
 def app(stocks):
+    st.write("WARNING!")
+    st.write('Using more symbols requires a longer timeframe for solver to properly assign weights,',
+             '7 year timeframe is recommend for 10 symbols')
     start, end = get_dates()
     mu, cov, data = get_data(start, end, stocks)
     riskfree = rf()
@@ -47,14 +52,23 @@ def get_data(start, end, stocks):
     data2 = data['Adj Close']
     data2.index = data2.index.strftime('%m/%d/%Y')
     st.dataframe(data2)
+    csv = convert_df(data2)
+
+    st.download_button(
+        label="Download data as CSV",
+        data=csv,
+        file_name='stock_prices.csv',
+        mime='text/csv',
+    )
+    st.pyplot(fig=plot_returns(data2))
+    st.pyplot(plot_returns_change(data2))
     mu = expected_returns.mean_historical_return(data2)
     mu = mu.sort_values(ascending=False)
-    st.write('Expected Returns')
+    st.subheader('Expected Returns')
     st.dataframe(mu)
     cov = risk_models.sample_cov(data2)
-    st.write('Covariance Matrix')
+    st.subheader('Covariance Matrix')
     st.dataframe(cov)
-    st.pyplot(fig=plot_returns(data2))
     return mu, cov, data2
 
 
@@ -64,6 +78,9 @@ def short_position():
     const = st.radio('Do you want to add constraints?', ('Yes', 'No'), index=1)
     return short, const
 
+def target ():
+    none= st.radio('Do you have a target?',('No,return,volatility,sharpe'), index=0)
+    return none
 
 def constraints(stocks):
     upper_bound = []
@@ -97,7 +114,6 @@ def constraints_no_shorting(stocks):
     y = stocks.split(',')
     min = 1 / (len(y))
     with st.form('myform'):
-        st.write('** To ensure that the sum of weights equals 1 the minimum weight is 1/ # of stocks which is ', min)
         st.header('Upper Bound')
         upper_bound.append(
             st.number_input('Enter maximum weight that a stock can have', value=.50, min_value=min, max_value=1.0,
@@ -107,6 +123,7 @@ def constraints_no_shorting(stocks):
         #     lower_bound.append(st.number_input(f'{x}', value=0.0, min_value=0.0, max_value=1.0, step=.01))
         # for keys, upper_bound in zip(keys, lower_bound):
         #     results_upper[keys] = upper_bound
+        st.write('** To ensure that the sum of weights equals 1 the minimum weight is 1/ # of stocks which is ', min)
         submitted = st.form_submit_button("Submit")
         if submitted:
             lower_bound = np.array(upper_bound)
@@ -219,9 +236,21 @@ def ef_no_bounds(riskfree, mu, cov, short, data):
 def plot_returns(data):
     plt.figure(figsize=(14, 7))
     for c in data.columns.values:
-        sn.lineplot(x=data.index, y=data[c], data=data)
+        sn.lineplot(x=data.index, y=data[c], data=data, label=c)
     plt.ylabel('Price in $')
+    plt.legend(loc='upper left')
+    plt.xticks(np.arange(0, len(data.index), step=60), rotation=-75)
 
+
+def plot_returns_change(data):
+    plt.figure(figsize=(14, 7))
+    data1 = data.pct_change()
+    data1.dropna(inplace=True)
+    for c in data1.columns.values:
+        sn.lineplot(x=data1.index, y=data1[c], data=data1, label=c)
+    plt.ylabel('Price in $')
+    plt.legend(loc='upper left')
+    plt.xticks(np.arange(0, len(data1.index), step=60), rotation=-75)
 
 def get_dates():
     with st.form('Dates'):
@@ -238,20 +267,20 @@ def ef_plt(mu, cov, riskfree, weights):
     ef = EfficientFrontier(mu, cov, weight_bounds=weights)
     fig, ax = plt.subplots()
     ef_max_sharpe = copy.deepcopy(ef)
-    plotting.plot_efficient_frontier(ef ,ef_param='utility',ax=ax, show_assets=True,show_tickers=True ,zorder=5)
+    plotting.plot_efficient_frontier(ef, ax=ax, show_assets=False, zorder=5)
 
     # Find the tangency portfolio
     ef_max_sharpe.max_sharpe(riskfree)
     ret_tangent, std_tangent, _ = ef_max_sharpe.portfolio_performance()
-    ax.scatter(std_tangent, ret_tangent, marker="*", s=100, c="orange", label="Max Sharpe",zorder=10)
+    ax.scatter(std_tangent, ret_tangent, marker="*", s=100, c="orange", label="Max Sharpe", zorder=10)
 
     # Generate random portfolios
-    n_samples = 10000
+    n_samples = 15000
     w = np.random.dirichlet(np.ones(ef.n_assets), n_samples)
     rets = w.dot(ef.expected_returns)
     stds = np.sqrt(np.diag(w @ ef.cov_matrix @ w.T))
     sharpes = rets / stds
-    ax.scatter(stds, rets, marker=".", c=sharpes, cmap="cool",zorder=0)
+    ax.scatter(stds, rets, marker=".", c=sharpes, cmap="cool", zorder=0)
 
     # Output
     ax.set_title("Efficient Frontier with random portfolios")
@@ -292,6 +321,9 @@ def ef_constraints_plt(mu, cov, riskfree, lower_constraints=None, constrains_upp
     plt.tight_layout()
     plt.show()
 
+@st.cache
+def convert_df(data):
+    return data.to_csv().encode('utf-8')
 
 if len(stocks) > 0:
     app(stocks)
