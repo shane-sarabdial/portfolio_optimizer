@@ -43,6 +43,7 @@ def app(stocks):
 
 
 # get stock data, return the expected mean and covariance matrix
+
 def get_data(start, end, stocks):
     st.write(stocks)
     data = yf.download(stocks, start=start, end=end)
@@ -81,6 +82,7 @@ def target():
     return none
 
 
+@st.cache(suppress_st_warning=True)
 def constraints(stocks):
     upper_bound = []
     col1, col2 = st.columns(2)
@@ -111,6 +113,7 @@ def constraints(stocks):
     return upper_bound, lower_bound
 
 
+@st.cache(suppress_st_warning=True)
 def constraints_no_shorting(stocks):
     upper_bound = []
     y = stocks.split(',')
@@ -135,6 +138,7 @@ def constraints_no_shorting(stocks):
     return upper_bound
 
 
+@st.cache(suppress_st_warning=True)
 def rf():
     st.header('Risk free rate')
     st.write('Enter a risk free rate')
@@ -142,6 +146,7 @@ def rf():
     return rf
 
 
+@st.cache(suppress_st_warning=True)
 def ef(riskfree, mu, cov, lower_constraints=None, constrains_upper=None):
     if lower_constraints is not None:
         weight_bounds = (-1, 1)
@@ -197,6 +202,7 @@ def ef(riskfree, mu, cov, lower_constraints=None, constrains_upper=None):
     st.pyplot(g)
 
 
+@st.cache(suppress_st_warning=True)
 def ef_no_bounds(riskfree, mu, cov, short, data):
     if short == "Yes":
         weights = (-1, 1)
@@ -238,6 +244,7 @@ def ef_no_bounds(riskfree, mu, cov, short, data):
     st.pyplot(g)
 
 
+@st.cache(suppress_st_warning=True)
 def plot_returns(data):
     plt.figure(figsize=(14, 7))
     for c in data.columns.values:
@@ -249,6 +256,7 @@ def plot_returns(data):
     plt.title('Daily Returns', fontsize=20)
 
 
+@st.cache(suppress_st_warning=True)
 def plot_returns_change(data):
     plt.figure(figsize=(14, 7))
     data1 = data.pct_change()
@@ -262,6 +270,7 @@ def plot_returns_change(data):
     plt.title('Daily Returns % Change', fontsize=20)
 
 
+@st.cache(suppress_st_warning=True)
 def get_dates():
     with st.form('Dates'):
         start = st.date_input("start date", datetime.date(2016, 1, 1))
@@ -273,6 +282,7 @@ def get_dates():
     return start, end
 
 
+@st.cache(suppress_st_warning=True)
 def ef_plt(mu, cov, riskfree, weights):
     ef = EfficientFrontier(mu, cov, weight_bounds=(None, None))
     fig, ax = plt.subplots()
@@ -299,6 +309,7 @@ def ef_plt(mu, cov, riskfree, weights):
     plt.show()
 
 
+@st.cache(suppress_st_warning=True)
 def ef_constraints_plt(mu, cov, riskfree, lower_constraints=None, constrains_upper=None):
     ef = EfficientFrontier(mu, cov, weight_bounds=(None, None))
     ef.add_constraint(lambda y: y <= constrains_upper)
