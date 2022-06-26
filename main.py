@@ -62,7 +62,7 @@ def get_data(start, end, stocks):
     )
     st.pyplot(fig=plot_returns(data2))
     st.pyplot(plot_returns_change(data2))
-    mu = expected_returns.mean_historical_return(data2)
+    mu = pypfopt.expected_returns.mean_historical_return(data2)
     mu = mu.sort_values(ascending=False)
     st.subheader('Expected Returns')
     st.dataframe(mu)
