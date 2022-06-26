@@ -18,7 +18,7 @@ st.set_option('deprecation.showPyplotGlobalUse', False)
 st.header('Portfolio')
 st.subheader('Created by Shane Sarabdial')
 st.subheader('Contact : Satramsarabdial12@gmail.com')
-default = 'SPY,AAPL,TSLA'
+default = 'SPY,AAPL,JPM,MSFT'
 stocks = st.text_input('Enter up to 10 tickers seperated by commas')
 if len(stocks.split(sep=',')) > 10:
     raise Exception(st.write("Sorry too many tickers"))
@@ -26,9 +26,6 @@ stocks = stocks.upper()
 
 
 def app(stocks):
-    st.write("WARNING!")
-    st.write('Using more symbols requires a longer timeframe for solver to properly assign weights,',
-             '7 year timeframe is recommend for 10 symbols')
     start, end = get_dates()
     mu, cov, data = get_data(start, end, stocks)
     riskfree = rf()
@@ -62,7 +59,7 @@ def get_data(start, end, stocks):
     )
     st.pyplot(fig=plot_returns(data2))
     st.pyplot(plot_returns_change(data2))
-    mu = pypfopt.expected_returns.mean_historical_return(data2)
+    mu = pypfopt.expected_returns.mean_historical_return(data2, compounding=False)
     mu = mu.sort_values(ascending=False)
     st.subheader('Expected Returns')
     st.dataframe(mu)
@@ -78,9 +75,11 @@ def short_position():
     const = st.radio('Do you want to add constraints?', ('Yes', 'No'), index=1)
     return short, const
 
-def target ():
-    none= st.radio('Do you have a target?',('No,return,volatility,sharpe'), index=0)
+
+def target():
+    none = st.radio('Do you have a target?', ('No,return,volatility,sharpe'), index=0)
     return none
+
 
 def constraints(stocks):
     upper_bound = []
@@ -88,13 +87,16 @@ def constraints(stocks):
     y = stocks.split(',')
     min = 1 / (len(y))
     with st.form('myform'):
+        st.write("WARNING!")
+        st.write('The solver may not be able to solve for the constraints given,',
+                 'if error occurs try changing the weights')
         st.write(
-            '** To ensure that the sum of weights equals 1 the minimum upper bound weight is 1/ # of stocks which is ',
+            'To ensure that the sum of weights equals 1 the minimum upper bound weight is 1/ # of stocks which is ',
             min)
         with col1:
             st.header('Upper Bound')
             upper_bound.append(
-                st.number_input('Enter maximum weight that a stock can have', value=.40, min_value=min, max_value=1.0,
+                st.number_input('Enter maximum weight that a stock can have', value=.60, min_value=min, max_value=1.0,
                                 step=.01))
         lower_bound = []
         with col2:
@@ -123,7 +125,10 @@ def constraints_no_shorting(stocks):
         #     lower_bound.append(st.number_input(f'{x}', value=0.0, min_value=0.0, max_value=1.0, step=.01))
         # for keys, upper_bound in zip(keys, lower_bound):
         #     results_upper[keys] = upper_bound
-        st.write('** To ensure that the sum of weights equals 1 the minimum weight is 1/ # of stocks which is ', min)
+        st.write("WARNING!")
+        st.write('The solver may not be able to solve for the constraints given,',
+                 'if error occurs try changing the weights')
+        st.write('To ensure that the sum of weights equals 1 the minimum weight is 1/ # of stocks which is ', min)
         submitted = st.form_submit_button("Submit")
         if submitted:
             lower_bound = np.array(upper_bound)
@@ -237,9 +242,11 @@ def plot_returns(data):
     plt.figure(figsize=(14, 7))
     for c in data.columns.values:
         sn.lineplot(x=data.index, y=data[c], data=data, label=c)
-    plt.ylabel('Price in $')
+    plt.ylabel('Price in $', fontsize=20)
+    plt.xlabel('Date ', fontsize=20)
     plt.legend(loc='upper left')
     plt.xticks(np.arange(0, len(data.index), step=60), rotation=-75)
+    plt.title('Daily Returns', fontsize=20)
 
 
 def plot_returns_change(data):
@@ -248,14 +255,17 @@ def plot_returns_change(data):
     data1.dropna(inplace=True)
     for c in data1.columns.values:
         sn.lineplot(x=data1.index, y=data1[c], data=data1, label=c)
-    plt.ylabel('Price in $')
+    plt.ylabel('% Change', fontsize=20)
+    plt.xlabel('Date ', fontsize=20)
     plt.legend(loc='upper left')
     plt.xticks(np.arange(0, len(data1.index), step=60), rotation=-75)
+    plt.title('Daily Returns % Change', fontsize=20)
+
 
 def get_dates():
     with st.form('Dates'):
-        start = st.date_input("start date", datetime.date(2020, 1, 1))
-        end = st.date_input("end date", datetime.date(2021, 1, 1))
+        start = st.date_input("start date", datetime.date(2016, 1, 1))
+        end = st.date_input("end date", datetime.date(2021, 12, 31))
         submitted = st.form_submit_button('Submit')
         if submitted:
             st.write(start)
@@ -264,15 +274,15 @@ def get_dates():
 
 
 def ef_plt(mu, cov, riskfree, weights):
-    ef = EfficientFrontier(mu, cov, weight_bounds=weights)
+    ef = EfficientFrontier(mu, cov, weight_bounds=(None, None))
     fig, ax = plt.subplots()
     ef_max_sharpe = copy.deepcopy(ef)
-    plotting.plot_efficient_frontier(ef, ax=ax, show_assets=False, zorder=5)
+    plotting.plot_efficient_frontier(ef, ax=ax, show_assets=False, zorder=10)
 
     # Find the tangency portfolio
     ef_max_sharpe.max_sharpe(riskfree)
-    ret_tangent, std_tangent, _ = ef_max_sharpe.portfolio_performance()
-    ax.scatter(std_tangent, ret_tangent, marker="*", s=100, c="orange", label="Max Sharpe", zorder=10)
+    ret_tangent, std_tangent, _ = ef_max_sharpe.portfolio_performance(verbose=True)
+    ax.scatter(std_tangent, ret_tangent, marker="*", s=100, c="orange", label="Max Sharpe", zorder=20)
 
     # Generate random portfolios
     n_samples = 8000
@@ -290,11 +300,7 @@ def ef_plt(mu, cov, riskfree, weights):
 
 
 def ef_constraints_plt(mu, cov, riskfree, lower_constraints=None, constrains_upper=None):
-    if lower_constraints is not None:
-        weight_bounds = (-1, 1)
-    else:
-        weight_bounds = (0, 1)
-    ef = EfficientFrontier(mu, cov, weight_bounds=weight_bounds)
+    ef = EfficientFrontier(mu, cov, weight_bounds=(None, None))
     ef.add_constraint(lambda y: y <= constrains_upper)
     if lower_constraints is not None:
         ef.add_constraint(lambda z: z >= lower_constraints)
@@ -321,9 +327,11 @@ def ef_constraints_plt(mu, cov, riskfree, lower_constraints=None, constrains_upp
     plt.tight_layout()
     plt.show()
 
+
 @st.cache
 def convert_df(data):
     return data.to_csv().encode('utf-8')
+
 
 if len(stocks) > 0:
     app(stocks)
