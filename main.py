@@ -9,10 +9,10 @@ import pypfopt
 from pypfopt import expected_returns
 from pypfopt import EfficientFrontier
 from pypfopt import plotting
-
 from pypfopt import risk_models
 import seaborn as sn
 import matplotlib.pyplot as plt
+from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
 
 st.set_option('deprecation.showPyplotGlobalUse', False)
 st.header('Portfolio')
@@ -36,10 +36,10 @@ def app(stocks):
         ef_no_bounds(riskfree, mu, cov, short, data)
     elif short == "Yes" and const == 'Yes':
         ub, lb = constraints(stocks)
-        ef(riskfree, mu, cov, lb, ub)
+        ef(riskfree, mu, cov, data, lb, ub)
     else:
         ub = constraints_no_shorting(stocks)
-        ef(riskfree, mu, cov, constrains_upper=ub)
+        ef(riskfree, mu, cov, data, constrains_upper=ub)
 
 
 # get stock data, return the expected mean and covariance matrix
@@ -75,7 +75,7 @@ def get_data(start, end, stocks):
 # ask user if they want to short and add constraints
 def short_position():
     short = st.radio('Do you want short positons in your portfolio?', ('Yes', 'No'), index=1)
-    const = st.radio('Do you want to add constraints?', ('Yes', 'No'), index=1)
+    const = st.radio('Do you want to add constraints?', ('Yes', 'No'), index=0)
     return short, const
 
 
@@ -145,45 +145,59 @@ def rf():
     return rf
 
 
-def ef(riskfree, mu, cov, lower_constraints=None, constrains_upper=None):
+def ef(riskfree, mu, cov, data, lower_constraints=None, constrains_upper=None):
+    port_val = st.number_input('Enter the value of your portfolio', value=10000.0)
     if lower_constraints is not None:
         weight_bounds = (-1, 1)
     else:
         weight_bounds = (0, 1)
     ef = EfficientFrontier(mu, cov, weight_bounds=weight_bounds)
-    # for t in constrains_upper:
-    #     if t == 0:
-    #         ef.add_constraint(lambda x: x >= 0)
-    #     else:
-    #         ef.add_constraint(lambda y: y <= t)
     ef.add_constraint(lambda y: y <= constrains_upper)
     if lower_constraints is not None:
         ef.add_constraint(lambda z: z >= lower_constraints)
     g = ef_constraints_plt(mu, cov, riskfree, lower_constraints, constrains_upper)
     sharpe = ef.max_sharpe(risk_free_rate=riskfree)
     clean_weights = ef.clean_weights()
+    all, lo = allocation(data, clean_weights, port_val)
     ef2 = EfficientFrontier(mu, cov, weight_bounds=weight_bounds)
     ef2.add_constraint(lambda y: y <= constrains_upper)
     if lower_constraints is not None:
         ef2.add_constraint(lambda z: z >= lower_constraints)
     risk = ef2.min_volatility()
     clean_weights1 = ef2.clean_weights()
+    all1, lo1 = allocation(data, clean_weights1, port_val)
     ef3 = EfficientFrontier(mu, cov, weight_bounds=weight_bounds)
     if lower_constraints is not None:
         ef3.add_constraint(lambda z: z >= lower_constraints)
     ef3.add_constraint(lambda y: y <= constrains_upper)
     mean = ef3._max_return()
     clean_weights2 = ef3.clean_weights()
+    all2, lo2 = allocation(data, clean_weights2, port_val)
     col1, col2, col3 = st.columns(3)
     with col1:
         st.write('Max Sharpe Portfolio')
-        st.write(pd.DataFrame(list(clean_weights.items()), columns=['Stock', 'Weights']))
+        df1 = pd.DataFrame(list(clean_weights.items()), columns=['Stock', 'Weights'])
+        df1 = df1.merge(all, on='Stock', how='outer')
+        df1.fillna(0, inplace=True)
+        df1['Shares'] = df1['Shares'].astype('int')
+        st.write(df1)
+        st.write('Funds remaining: ${:.2f}'.format(lo))
     with col2:
         st.write('Minimum Volatility Portfolio')
-        st.write(pd.DataFrame(list(clean_weights1.items()), columns=['Stock', 'Weights']))
+        df2 = pd.DataFrame(list(clean_weights1.items()), columns=['Stock', 'Weights'])
+        df2 = df2.merge(all1, on='Stock', how='outer')
+        df2.fillna(0, inplace=True)
+        df2['Shares'] = df2['Shares'].astype('int')
+        st.write(df2)
+        st.write('Funds remaining: ${:.2f}'.format(lo1))
     with col3:
         st.write('Maximum Return Portfolio')
-        st.write(pd.DataFrame(list(clean_weights2.items()), columns=['Stock', 'Weights']))
+        df3 = pd.DataFrame(list(clean_weights2.items()), columns=['Stock', 'Weights'])
+        df3 = df3.merge(all2, on='Stock', how='outer')
+        df3.fillna(0, inplace=True)
+        df3['Shares'] = df3['Shares'].astype('int')
+        st.write(df3)
+        st.write('Funds remaining: ${:.2f}'.format(lo2))
     col4, col5, col6 = st.columns(3)
     with col4:
         x = pd.DataFrame(ef.portfolio_performance(risk_free_rate=riskfree, verbose=True),
@@ -201,6 +215,7 @@ def ef(riskfree, mu, cov, lower_constraints=None, constrains_upper=None):
 
 
 def ef_no_bounds(riskfree, mu, cov, short, data):
+    port_val = st.number_input('Enter the value of your portfolio', value=10000.0)
     if short == "Yes":
         weights = (-1, 1)
     else:
@@ -208,22 +223,40 @@ def ef_no_bounds(riskfree, mu, cov, short, data):
     ef = EfficientFrontier(mu, cov, weight_bounds=weights)
     sharpe = ef.max_sharpe(risk_free_rate=riskfree)
     clean_weights = ef.clean_weights()
+    all, lo = allocation(data, clean_weights,port_val)
     ef2 = EfficientFrontier(mu, cov, weight_bounds=weights)
     risk = ef2.min_volatility()
     clean_weights1 = ef2.clean_weights()
+    all1, lo1 = allocation(data, clean_weights1,port_val)
     ef3 = EfficientFrontier(mu, cov, weight_bounds=weights)
     mean = ef3._max_return()
     clean_weights2 = ef3.clean_weights()
+    all2, lo2 = allocation(data, clean_weights2,port_val)
     col1, col2, col3 = st.columns(3)
     with col1:
         st.write('Max Sharpe Portfolio')
-        st.write(pd.DataFrame(list(clean_weights.items()), columns=['Stock', 'Weights']))
+        df1 = pd.DataFrame(list(clean_weights.items()), columns=['Stock', 'Weights'])
+        df1 = df1.merge(all, on='Stock', how='outer')
+        df1.fillna(0, inplace=True)
+        df1['Shares']= df1['Shares'].astype('int')
+        st.write(df1)
+        st.write('Funds remaining: ${:.2f}'.format(lo))
     with col2:
         st.write('Minimum Volatility Portfolio')
-        st.write(pd.DataFrame(list(clean_weights1.items()), columns=['Stock', 'Weights']))
+        df2 =pd.DataFrame(list(clean_weights1.items()), columns=['Stock', 'Weights'])
+        df2 = df2.merge(all1, on='Stock', how='outer')
+        df2.fillna(0, inplace=True)
+        df2['Shares'] = df2['Shares'].astype('int')
+        st.write(df2)
+        st.write('Funds remaining: ${:.2f}'.format(lo1))
     with col3:
         st.write('Maximum Return Portfolio')
-        st.write(pd.DataFrame(list(clean_weights2.items()), columns=['Stock', 'Weights']))
+        df3 =pd.DataFrame(list(clean_weights2.items()), columns=['Stock', 'Weights'])
+        df3 = df3.merge(all2, on='Stock', how='outer')
+        df3.fillna(0, inplace=True)
+        df3['Shares'] = df3['Shares'].astype('int')
+        st.write(df3)
+        st.write('Funds remaining: ${:.2f}'.format(lo2))
     col4, col5, col6 = st.columns(3)
     with col4:
         x = pd.DataFrame(ef.portfolio_performance(risk_free_rate=riskfree, verbose=True),
@@ -338,6 +371,14 @@ def ef_constraints_plt(mu, cov, riskfree, lower_constraints=None, constrains_upp
 @st.experimental_memo
 def convert_df(data):
     return data.to_csv().encode('utf-8')
+
+
+def allocation(data, weights, port_val):
+    latest_prices = get_latest_prices(data)
+    da = DiscreteAllocation(weights, latest_prices, port_val)
+    allocation, leftover = da.lp_portfolio()
+    allocation = pd.DataFrame(list(allocation.items()), columns=['Stock', 'Shares'])
+    return allocation, leftover
 
 
 if len(stocks) > 0:
