@@ -216,6 +216,8 @@ def ef(riskfree, mu, cov, data, lower_constraints=None, constrains_upper=None):
 
 def ef_no_bounds(riskfree, mu, cov, short, data):
     port_val = st.number_input('Enter the value of your portfolio', value=10000.0)
+    st.write('Warning! The share price used for allocation of shares is the last price in the dataset')
+    st.write('To get a accurate share allocation change the end date to today or yesterdays date.')
     if short == "Yes":
         weights = (-1, 1)
     else:
