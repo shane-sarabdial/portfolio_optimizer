@@ -68,7 +68,7 @@ def get_data(start, end, stocks):
     st.subheader('Covariance Matrix')
     st.dataframe(cov)
     with st.spinner('loading...'):
-        time.sleep(5)
+        time.sleep(3)
     return mu, cov, data2
 
 
@@ -82,7 +82,6 @@ def short_position():
 def target():
     none = st.radio('Do you have a target?', ('No,return,volatility,sharpe'), index=0)
     return none
-
 
 
 def constraints(stocks):
@@ -139,13 +138,11 @@ def constraints_no_shorting(stocks):
     return upper_bound
 
 
-
 def rf():
     st.header('Risk free rate')
     st.write('Enter a risk free rate')
     rf = st.number_input("Risk Free Rate", value=0.02, min_value=0.0, max_value=2.0, step=0.01)
     return rf
-
 
 
 def ef(riskfree, mu, cov, lower_constraints=None, constrains_upper=None):
@@ -203,7 +200,6 @@ def ef(riskfree, mu, cov, lower_constraints=None, constrains_upper=None):
     st.pyplot(g)
 
 
-
 def ef_no_bounds(riskfree, mu, cov, short, data):
     if short == "Yes":
         weights = (-1, 1)
@@ -245,7 +241,7 @@ def ef_no_bounds(riskfree, mu, cov, short, data):
     st.pyplot(g)
 
 
-@st.cache(suppress_st_warning=True)
+@st.experimental_memo
 def plot_returns(data):
     plt.figure(figsize=(14, 7))
     for c in data.columns.values:
@@ -257,7 +253,7 @@ def plot_returns(data):
     plt.title('Daily Returns', fontsize=20)
 
 
-@st.cache(suppress_st_warning=True)
+@st.experimental_memo
 def plot_returns_change(data):
     plt.figure(figsize=(14, 7))
     data1 = data.pct_change()
@@ -271,7 +267,6 @@ def plot_returns_change(data):
     plt.title('Daily Returns % Change', fontsize=20)
 
 
-
 def get_dates():
     with st.form('Dates'):
         start = st.date_input("start date", datetime.date(2016, 1, 1))
@@ -283,7 +278,7 @@ def get_dates():
     return start, end
 
 
-@st.cache(suppress_st_warning=True)
+@st.experimental_memo
 def ef_plt(mu, cov, riskfree, weights):
     ef = EfficientFrontier(mu, cov, weight_bounds=(None, None))
     fig, ax = plt.subplots()
@@ -310,7 +305,7 @@ def ef_plt(mu, cov, riskfree, weights):
     plt.show()
 
 
-@st.cache(suppress_st_warning=True)
+@st.experimental_memo
 def ef_constraints_plt(mu, cov, riskfree, lower_constraints=None, constrains_upper=None):
     ef = EfficientFrontier(mu, cov, weight_bounds=(None, None))
     ef.add_constraint(lambda y: y <= constrains_upper)
@@ -340,7 +335,7 @@ def ef_constraints_plt(mu, cov, riskfree, lower_constraints=None, constrains_upp
     plt.show()
 
 
-@st.cache
+@st.experimental_memo
 def convert_df(data):
     return data.to_csv().encode('utf-8')
 
