@@ -18,6 +18,7 @@ st.set_option('deprecation.showPyplotGlobalUse', False)
 st.header('Portfolio')
 st.subheader('Created by Shane Sarabdial')
 st.subheader('Contact : Satramsarabdial12@gmail.com')
+st.write('App is in beta. Some elements may not load the first time, try reloading the page')
 default = 'SPY,AAPL,JPM,MSFT'
 stocks = st.text_input('Enter up to 10 tickers seperated by commas')
 if len(stocks.split(sep=',')) > 10:
