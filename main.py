@@ -1,6 +1,6 @@
 import copy
 import datetime
-
+import time
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -67,6 +67,8 @@ def get_data(start, end, stocks):
     cov = risk_models.sample_cov(data2)
     st.subheader('Covariance Matrix')
     st.dataframe(cov)
+    with st.spinner('loading...'):
+        time.sleep(5)
     return mu, cov, data2
 
 
@@ -243,7 +245,7 @@ def ef_no_bounds(riskfree, mu, cov, short, data):
     st.pyplot(g)
 
 
-
+@st.cache(suppress_st_warning=True)
 def plot_returns(data):
     plt.figure(figsize=(14, 7))
     for c in data.columns.values:
@@ -255,7 +257,7 @@ def plot_returns(data):
     plt.title('Daily Returns', fontsize=20)
 
 
-
+@st.cache(suppress_st_warning=True)
 def plot_returns_change(data):
     plt.figure(figsize=(14, 7))
     data1 = data.pct_change()
@@ -269,7 +271,7 @@ def plot_returns_change(data):
     plt.title('Daily Returns % Change', fontsize=20)
 
 
-@st.cache(suppress_st_warning=True)
+
 def get_dates():
     with st.form('Dates'):
         start = st.date_input("start date", datetime.date(2016, 1, 1))
