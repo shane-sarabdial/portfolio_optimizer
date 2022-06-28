@@ -14,6 +14,7 @@ from pypfopt import risk_models
 import seaborn as sn
 import matplotlib.pyplot as plt
 from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
+from datetime import timedelta, date
 
 st.set_option('deprecation.showPyplotGlobalUse', False)
 st.header('Efficient Frontier Portfolio')
@@ -53,7 +54,6 @@ def get_data(start, end, stocks):
     data2.index = data2.index.strftime('%m/%d/%Y')
     st.dataframe(data2)
     csv = convert_df(data2)
-
     st.download_button(
         label="Download data as CSV",
         data=csv,
@@ -62,20 +62,27 @@ def get_data(start, end, stocks):
     )
     st.pyplot(fig=plot_returns(data2))
     st.pyplot(plot_returns_change(data2))
-    mu = pypfopt.expected_returns.mean_historical_return(data2, compounding=False)
+    mu, cov = ret_cov(data2)
+    st.header('Efficient Frontier')
+    return mu, cov, data2
+
+
+@st.experimental_memo(suppress_st_warning=True)
+def ret_cov(data):
+    mu = pypfopt.expected_returns.mean_historical_return(data, compounding=False)
     mu = mu.sort_values(ascending=True)
     col1, col2 = st.columns([1, 3])
     with col1:
         st.markdown('#### Annual Returns')
         st.dataframe(mu)
     with col2:
-        cov = risk_models.sample_cov(data2)
+        cov = risk_models.sample_cov(data)
         st.markdown('#### Covariance Matrix')
         st.dataframe(cov)
     with st.spinner('loading...'):
         time.sleep(3)
-    st.header('Efficient Frontier')
-    return mu, cov, data2
+    return mu,cov
+
 
 
 # ask user if they want to short and add constraints
@@ -121,20 +128,16 @@ def constraints(stocks):
     with st.form('myform'):
         st.warning('The solver may not be able to solve for the constraints given, if error occurs try changing the '
                    'weights')
-        with col1:
-            upper_bound.append(
-                st.number_input('Upper Bound', value=.60, min_value=min, max_value=1.0,
-                                step=.01,
-                                help=f"Set the maximum weight any 1 stock can have. To ensure that the sum of "
-                                     f"weights equals 1, the minimum upper bound weight is 1/ # of stocks which"
-                                     f" is  {min}"))
-
-        with col2:
-            lower_bound.append(
-                st.number_input('Lower Bound', value=-.30, min_value=-1.0, max_value=0.0,
-                                step=.01, help='Set the maximum weight that any 1 stock can be shorted'))
-        submitted = st.form_submit_button("Submit", help=(f"To ensure that the sum of weights equals 1, the minimum "
-                                                          f"upper bound weight is 1/ # of stocks which is  {min}"))
+        upper_bound.append(
+            st.number_input('Upper Bound', value=.60, min_value=min, max_value=1.0,
+                            step=.01,
+                            help=f"Set the maximum weight any 1 stock can have. To ensure that the sum of "
+                                 f"weights equals 1, the minimum upper bound weight is 1/ # of stocks which"
+                                 f" is  {min}"))
+        lower_bound.append(
+            st.number_input('Lower Bound', value=-.30, min_value=-1.0, max_value=0.0,
+                            step=.01, help='Set the maximum weight that any 1 stock can be shorted'))
+        submitted = st.form_submit_button("Submit")
     if submitted:
             lower_bound = np.array(lower_bound)
             upper_bound = np.array(upper_bound)
@@ -351,13 +354,15 @@ def plot_returns_change(data):
 
 
 def get_dates():
+    today = date.today()
+    yesterday = today -timedelta(days=1)
+    years_ago = today-timedelta(1825)
     with st.form('Dates'):
-        start = st.date_input("start date", datetime.date(2016, 1, 1))
-        end = st.date_input("end date", datetime.date(2021, 12, 31))
+        start = st.date_input("start date", years_ago)
+        end = st.date_input("end date", yesterday)
         submitted = st.form_submit_button('Submit')
         if submitted:
-            st.write(start)
-            st.write(end)
+            print(start, end)
     return start, end
 
 
