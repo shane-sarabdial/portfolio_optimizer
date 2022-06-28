@@ -16,6 +16,14 @@ import matplotlib.pyplot as plt
 from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
 from datetime import timedelta, date
 
+st.set_page_config(page_title='Portfolio Optimizer')
+hide_menu_style = """
+    <style>
+    footer{visibility: hidden;}
+    </style>
+    """
+st.markdown(hide_menu_style, unsafe_allow_html=True)
+
 st.set_option('deprecation.showPyplotGlobalUse', False)
 st.header('Efficient Frontier Portfolio')
 st.subheader('Created by Shane Sarabdial')
