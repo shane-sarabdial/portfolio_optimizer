@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
 from datetime import timedelta, date
 
+# set page config
 st.set_page_config(page_title='Portfolio Optimizer')
 hide_menu_style = """
     <style>
@@ -29,11 +30,17 @@ st.header('Efficient Frontier Portfolio')
 st.subheader('Created by Shane Sarabdial')
 st.subheader('Contact : Satramsarabdial12@gmail.com')
 st.write('App is in beta. Some elements may not load the first time, try reloading the page')
-default = 'AMD,NFLX,AMZN,JPM,GE'
-stocks = st.text_input('Enter up to 10 tickers seperated by commas')
-if len(stocks.split(sep=',')) > 10:
-    raise Exception(st.write("Sorry too many tickers"))
-stocks = stocks.upper()
+
+def get_stock():
+    stocks = st.text_input('Enter up to 10 tickers seperated by commas and more than 3')
+    stocks = stocks.upper()
+    if len(stocks.split(sep=',')) > 10:
+        raise Exception(st.write("Sorry too many tickers"))
+    if len(stocks.split(sep=',')) < 3:
+        st.warning('Using less than 3 stocks will cause errors, stocks defaulted to assigned tickers. Please use more '
+                   'than 3 tickers ')
+        stocks = 'AMD,NFLX,AMZN,JPM,GE'
+    return stocks
 
 
 def app(stocks):
@@ -53,8 +60,9 @@ def app(stocks):
         ef(riskfree, mu, cov, data, constrains_upper=ub)
     st.video("https://www.youtube.com/watch?v=PiXrLGMZr1g&t=1s&ab_channel=Investopedia")
 
-# get stock data, return the expected mean and covariance matrix
 
+# takes user input and gets stock data from yahoo
+# calls function to plot data and returns/covariance dataframes
 def get_data(start, end, stocks):
     st.write(stocks)
     data = yf.download(stocks, start=start, end=end)
@@ -68,13 +76,14 @@ def get_data(start, end, stocks):
         file_name='stock_prices.csv',
         mime='text/csv',
     )
-    st.pyplot(fig=plot_returns(data2))
+    st.pyplot(plot_returns(data2))
     st.pyplot(plot_returns_change(data2))
     mu, cov = ret_cov(data2)
     st.header('Efficient Frontier')
     return mu, cov, data2
 
 
+# function for creating returns and covriance dataframe
 @st.experimental_memo(suppress_st_warning=True)
 def ret_cov(data):
     mu = pypfopt.expected_returns.mean_historical_return(data, compounding=False)
@@ -89,8 +98,7 @@ def ret_cov(data):
         st.dataframe(cov)
     with st.spinner('loading...'):
         time.sleep(3)
-    return mu,cov
-
+    return mu, cov
 
 
 # ask user if they want to short and add constraints
@@ -122,15 +130,11 @@ def short_position():
     return short, const
 
 
-def target():
-    none = st.radio('Do you have a target?', 'No,return,volatility,sharpe', index=0)
-    return none
-
-
+# gets lower and upper bound constraints from user
+# creates a form which the user will inout data
 def constraints(stocks):
     upper_bound = []
     lower_bound = []
-    col1, col2 = st.columns(2)
     y = stocks.split(',')
     min = 1 / (len(y))
     with st.form('myform'):
@@ -147,11 +151,13 @@ def constraints(stocks):
                             step=.01, help='Set the maximum weight that any 1 stock can be shorted'))
         submitted = st.form_submit_button("Submit")
     if submitted:
-            lower_bound = np.array(lower_bound)
-            upper_bound = np.array(upper_bound)
+        lower_bound = np.array(lower_bound)
+        upper_bound = np.array(upper_bound)
     return upper_bound, lower_bound
 
 
+# gets upper bound constraints from user
+# creates a form which the user will inout data
 def constraints_no_shorting(stocks):
     upper_bound = []
     y = stocks.split(',')
@@ -174,7 +180,7 @@ def constraints_no_shorting(stocks):
             lower_bound = np.array(upper_bound)
     return upper_bound
 
-
+# define risk free rate and gets user input
 def rf():
     rf = st.number_input("Risk Free Rate", value=0.02, min_value=0.0, max_value=2.0, step=0.01, help="The risk-free "
                                                                                                      "rate of return "
@@ -191,7 +197,12 @@ def rf():
                                                                                                      "rate.")
     return rf
 
-
+# in this function the user selects constraints = yes and (short = no or yes)
+# checks if user wants to short and adds constraints
+# takes lower and upper bound and creates constraints for the efficient frontier
+# creates several dataframes that return the max sharpe, min volatility, and max return portfolios
+# plots the efficient frontier
+# creates a dataframe that defines share allocation based on the portfolio value
 def ef(riskfree, mu, cov, data, lower_constraints=None, constrains_upper=None):
     port_val = st.number_input('Enter the value of your portfolio', value=10000.0, help='The share price used for '
                                                                                         'allocation of shares is the '
@@ -267,7 +278,12 @@ def ef(riskfree, mu, cov, data, lower_constraints=None, constrains_upper=None):
     st.pyplot(g)
     st.caption('Any Portfolio above the efficient frontier cannot exist')
 
-
+# in this function the user selects constraints = no and (short = no or yes)
+# checks if user wants to short and adds constraints
+# in this function the user selected no constraints but can short or long
+# creates several dataframes that return the max sharpe, min volatility, and max return portfolios
+# plots the efficient frontier
+# creates a dataframe that defines share allocation based on the portfolio value
 def ef_no_bounds(riskfree, mu, cov, short, data):
     port_val = st.number_input('Enter the value of your portfolio', value=10000.0, help='The share price used for '
                                                                                         'allocation of shares is the '
@@ -334,7 +350,7 @@ def ef_no_bounds(riskfree, mu, cov, short, data):
     st.pyplot(g)
     st.caption('Any Portfolio above the efficient frontier cannot exist')
 
-
+# function plots the returns of stocks
 @st.experimental_memo
 def plot_returns(data):
     plt.figure(figsize=(14, 7))
@@ -346,7 +362,7 @@ def plot_returns(data):
     plt.xticks(np.arange(0, len(data.index), step=60), rotation=-75)
     plt.title('Daily Returns', fontsize=20)
 
-
+# function plots the % returns
 @st.experimental_memo
 def plot_returns_change(data):
     plt.figure(figsize=(14, 7))
@@ -360,11 +376,11 @@ def plot_returns_change(data):
     plt.xticks(np.arange(0, len(data1.index), step=60), rotation=-75)
     plt.title('Daily Returns % Change', fontsize=20)
 
-
+# function gets dates from user and sets the default dates
 def get_dates():
     today = date.today()
-    yesterday = today -timedelta(days=1)
-    years_ago = today-timedelta(1825)
+    yesterday = today - timedelta(days=1)
+    years_ago = today - timedelta(1825)
     with st.form('Dates'):
         start = st.date_input("start date", years_ago)
         end = st.date_input("end date", yesterday)
@@ -373,7 +389,9 @@ def get_dates():
             print(start, end)
     return start, end
 
-
+# function plots the efficient frontier and random portfolios
+# code can be found on pyportfolioopt docs
+# plot is used when user has no constraints and can either short or go long
 @st.experimental_memo(suppress_st_warning=True)
 def ef_plt(mu, cov, riskfree, weights):
     ef = EfficientFrontier(mu, cov, weight_bounds=(None, None))
@@ -407,7 +425,9 @@ def ef_plt(mu, cov, riskfree, weights):
     ax.legend()
     plt.tight_layout()
 
-
+# function plots the efficient frontier and random portfolios
+# code can be found on pyportfolioopt docs
+# plot is used when user  HAS constraints and can either short or go long
 @st.experimental_memo(suppress_st_warning=True)
 def ef_constraints_plt(mu, cov, riskfree, lower_constraints=None, constrains_upper=None):
     ef = EfficientFrontier(mu, cov, weight_bounds=(None, None))
@@ -443,14 +463,13 @@ def ef_constraints_plt(mu, cov, riskfree, lower_constraints=None, constrains_upp
     ax.legend()
     plt.tight_layout()
 
-
-
-
+# creates a csv file for user to download
 @st.experimental_memo
 def convert_df(data):
     return data.to_csv().encode('utf-8')
 
-
+# uses two methods to allocate stocks based on the users portfolio value
+# if greedy method fail use lp method
 def allocation(data, weights, port_val):
     latest_prices = get_latest_prices(data)
     da = DiscreteAllocation(weights, latest_prices, port_val)
@@ -461,8 +480,6 @@ def allocation(data, weights, port_val):
     allocation = pd.DataFrame(list(allocation.items()), columns=['Stock', 'Shares'])
     return allocation, leftover
 
-
-if len(stocks) > 0:
-    app(stocks)
-else:
-    app(default)
+# checks if user has in
+stocks = get_stock()
+app(stocks)
