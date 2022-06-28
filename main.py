@@ -37,7 +37,7 @@ def get_stock():
     if len(stocks.split(sep=',')) > 10:
         raise Exception(st.write("Sorry too many tickers"))
     if len(stocks.split(sep=',')) < 3:
-        st.warning('Using less than 3 stocks will cause errors, stocks defaulted to assigned tickers. Please use more '
+        st.caption('Using less than 3 stocks will cause errors, stocks defaulted to assigned tickers. Please use more '
                    'than 3 tickers ')
         stocks = 'AMD,NFLX,AMZN,JPM,GE'
     return stocks
@@ -483,3 +483,4 @@ def allocation(data, weights, port_val):
 # checks if user has in
 stocks = get_stock()
 app(stocks)
+
