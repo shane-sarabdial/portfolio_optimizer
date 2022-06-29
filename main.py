@@ -107,7 +107,7 @@ def ret_cov(data):
         st.dataframe(mu)
     with col2:
         cov = risk_models.sample_cov(data)
-        st.markdown('<h3 align="left"> Correlation Matrix </h3>', unsafe_allow_html=True)
+        st.markdown('<h3 align="left"> Covariance Matrix </h3>', unsafe_allow_html=True)
         st.dataframe(cov)
     with st.spinner('loading...'):
         time.sleep(3)
@@ -116,29 +116,29 @@ def ret_cov(data):
 
 # ask user if they want to short and add constraints
 def short_position():
-    short = st.radio('Do you want short positons in your portfolio?', ('Yes', 'No'), index=1, help='A short, or a '
-                                                                                                   'short position, '
-                                                                                                   'is created when a '
-                                                                                                   'trader sells a '
-                                                                                                   'security first '
-                                                                                                   'with the '
-                                                                                                   'intention of '
-                                                                                                   'repurchasing it '
-                                                                                                   'or covering it '
-                                                                                                   'later at a lower '
-                                                                                                   'price. A trader '
-                                                                                                   'may decide to '
-                                                                                                   'short a security '
-                                                                                                   'when she believes '
-                                                                                                   'that the price of '
-                                                                                                   'that security is '
-                                                                                                   'likely to '
-                                                                                                   'decrease in the '
-                                                                                                   'near future.')
+    short = st.radio('Do you want short positions in your portfolio?', ('Yes', 'No'), index=1, help='A short, or a '
+                                                                                                    'short position, '
+                                                                                                    'is created when a '
+                                                                                                    'trader sells a '
+                                                                                                    'security first '
+                                                                                                    'with the '
+                                                                                                    'intention of '
+                                                                                                    'repurchasing it '
+                                                                                                    'or covering it '
+                                                                                                    'later at a lower '
+                                                                                                    'price. A trader '
+                                                                                                    'may decide to '
+                                                                                                    'short a security '
+                                                                                                    'when she believes '
+                                                                                                    'that the price of '
+                                                                                                    'that security is '
+                                                                                                    'likely to '
+                                                                                                    'decrease in the '
+                                                                                                    'near future.')
     const = st.radio('Do you want to add constraints?', ('Yes', 'No'), index=0, help='Adding constraints will place '
                                                                                      'restrictions on the maximum '
                                                                                      'weights that any 1 long or '
-                                                                                     'short postion can have '
+                                                                                     'short position can have '
                      )
     return short, const
 
