@@ -85,14 +85,14 @@ def get_data(start, end, stocks):
         mime='text/csv',
     )
     st.caption('Double or single click on legend tickers to add or remove elements')
-    st.markdown('<h4 align="center"> Daily Returns </h4>', unsafe_allow_html=True)
+    st.markdown('<h4 align="center"> <span style="font-family:Ariel">Daily Returns</span> </h4>', unsafe_allow_html =True)
     st.plotly_chart(daily_ret_plot(data2))
-    st.markdown('<h4 align="center"> Daily Returns % Change  </h4>', unsafe_allow_html=True)
+    st.markdown('<h4 align="center"> <span style="font-family:Ariel">Daily Returns % Change</span> </h4>', unsafe_allow_html =True)
     st.plotly_chart(percent_change_ret(data2))
-    st.markdown('<h4 align="center"> Correlation Matrix </h4>', unsafe_allow_html=True)
+    st.markdown('<h4 align="center"> <span style="font-family:Ariel">Correlation Matrix</span> </h4>', unsafe_allow_html =True)
     st.pyplot(corr_matrix(data2))
     mu, cov = ret_cov(data2)
-    st.header('Efficient Frontier')
+    st.markdown('<h1 align="left"> <span style="font-family:Ariel">Efficient Frontier</span> </h1>', unsafe_allow_html =True)
     return mu, cov, data2
 
 
@@ -103,11 +103,11 @@ def ret_cov(data):
     mu = mu.sort_values(ascending=True)
     col1, col2 = st.columns([1, 3])
     with col1:
-        st.markdown('<h4 align="Left"> Annual Returns </h4>', unsafe_allow_html=True)
+        st.markdown('<h4 align="left"> <span style="font-family:Ariel">Annual Returns</span> </h4>', unsafe_allow_html =True)
         st.dataframe(mu)
     with col2:
         cov = risk_models.sample_cov(data)
-        st.markdown('<h3 align="left"> Covariance Matrix </h3>', unsafe_allow_html=True)
+        st.markdown('<h4 align="left"> <span style="font-family:Ariel">Covariance Matrix</span> </h4>', unsafe_allow_html =True)
         st.dataframe(cov)
     with st.spinner('loading...'):
         time.sleep(3)
@@ -290,6 +290,9 @@ def ef(riskfree, mu, cov, data, lower_constraints=None, constrains_upper=None):
         x = pd.DataFrame(ef3.portfolio_performance(risk_free_rate=riskfree, verbose=True),
                          index=['Expected Return', 'Volatility', 'Sharpe Ratio'])
         st.write(x)
+    st.markdown('<h4 align="center"> <span style="font-family:Ariel">Efficient Frontier with Random Portfolios</span> '
+                '</h4>',
+                unsafe_allow_html=True)
     st.pyplot(g)
     st.caption('Any Portfolio above the efficient frontier cannot exist')
 
@@ -363,6 +366,9 @@ def ef_no_bounds(riskfree, mu, cov, short, data):
                          index=['Expected Return', 'Volatility', 'Sharpe Ratio'])
         st.write(z)
     g = ef_plt(mu, cov, riskfree, weights)
+    st.markdown('<h4 align="center"> <span style="font-family:Ariel">Efficient Frontier with Random Portfolios</span> '
+                '</h4>',
+                unsafe_allow_html=True)
     st.pyplot(g)
     st.caption('Any Portfolio above the efficient frontier cannot exist')
 
@@ -378,7 +384,7 @@ def ef_no_bounds(riskfree, mu, cov, short, data):
 #     plt.xlabel('Date ', fontsize=20)
 #     plt.legend(loc='upper left')
 #     plt.xticks(np.arange(0, len(data.index), step=60), rotation=-75)
-#     plt.title('Daily Returns', fontsize=20)
+#     plt.title('Daily Returns', fontsize=2
 
 @st.experimental_memo
 def daily_ret_plot(data):
@@ -439,7 +445,7 @@ def percent_change_ret(data):
             tickangle=70),
         plot_bgcolor='white',
         margin=dict(autoexpand=True, l=10, r=10, t=40),
-        xaxis_title='Date', yaxis_title='Price in $',
+        xaxis_title='Date', yaxis_title='% Change',
         yaxis=dict(
             showgrid=False, showline=False, zeroline=False,
             tickfont=dict(family='Ariel', size=13)),
@@ -506,7 +512,6 @@ def ef_plt(mu, cov, riskfree, weights):
     ax.scatter(stds, rets, marker=".", c=sharpes, cmap="cool", zorder=0)
 
     # Output
-    ax.set_title("Efficient Frontier with random portfolios")
     ax.legend()
     plt.tight_layout()
 
@@ -546,7 +551,6 @@ def ef_constraints_plt(mu, cov, riskfree, lower_constraints=None, constrains_upp
     ax.scatter(stds, rets, marker=".", c=sharpes, cmap="cool", zorder=0)
 
     # Output
-    ax.set_title("Efficient Frontier with random portfolios")
     ax.legend()
     plt.tight_layout()
 
