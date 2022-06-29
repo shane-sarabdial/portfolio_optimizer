@@ -15,6 +15,8 @@ import seaborn as sn
 import matplotlib.pyplot as plt
 from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
 from datetime import timedelta, date
+import plotly.express as px
+import plotly.graph_objects as go
 
 # set page config
 st.set_page_config(page_title='Portfolio Optimizer')
@@ -31,6 +33,7 @@ st.subheader('Created by Shane Sarabdial')
 st.subheader('Contact : Satramsarabdial12@gmail.com')
 st.write('App is in beta. Some elements may not load the first time, try reloading the page')
 
+
 def get_stock():
     stocks = st.text_input('Enter up to 10 tickers seperated by commas and more than 3')
     stocks = stocks.upper()
@@ -45,7 +48,11 @@ def get_stock():
 
 def app(stocks):
     start, end = get_dates()
-    mu, cov, data = get_data(start, end, stocks)
+    try:
+        mu, cov, data = get_data(start, end, stocks)
+    except AttributeError:
+        st.warning('You entered a invalid ticker or forgot to use a comma')
+        raise
     riskfree = rf()
     short, const = short_position()
     if const == 'No' and short == 'Yes':
@@ -67,7 +74,8 @@ def get_data(start, end, stocks):
     st.write(stocks)
     data = yf.download(stocks, start=start, end=end)
     data2 = data['Adj Close']
-    data2.index = data2.index.strftime('%m/%d/%Y')
+    data2.index = data2.index.strftime('%Y-%m-%d')
+    data2.dropna(inplace=True)
     st.dataframe(data2)
     csv = convert_df(data2)
     st.download_button(
@@ -76,8 +84,13 @@ def get_data(start, end, stocks):
         file_name='stock_prices.csv',
         mime='text/csv',
     )
-    st.pyplot(plot_returns(data2))
-    st.pyplot(plot_returns_change(data2))
+    st.caption('Double or single click on legend tickers to add or remove elements')
+    st.markdown('<h4 align="center"> Daily Returns </h4>', unsafe_allow_html=True)
+    st.plotly_chart(daily_ret_plot(data2))
+    st.markdown('<h4 align="center"> Daily Returns % Change  </h4>', unsafe_allow_html=True)
+    st.plotly_chart(percent_change_ret(data2))
+    st.markdown('<h4 align="center"> Correlation Matrix </h4>', unsafe_allow_html=True)
+    st.pyplot(corr_matrix(data2))
     mu, cov = ret_cov(data2)
     st.header('Efficient Frontier')
     return mu, cov, data2
@@ -90,11 +103,11 @@ def ret_cov(data):
     mu = mu.sort_values(ascending=True)
     col1, col2 = st.columns([1, 3])
     with col1:
-        st.markdown('#### Annual Returns')
+        st.markdown('<h4 align="Left"> Annual Returns </h4>', unsafe_allow_html=True)
         st.dataframe(mu)
     with col2:
         cov = risk_models.sample_cov(data)
-        st.markdown('#### Covariance Matrix')
+        st.markdown('<h3 align="left"> Correlation Matrix </h3>', unsafe_allow_html=True)
         st.dataframe(cov)
     with st.spinner('loading...'):
         time.sleep(3)
@@ -180,6 +193,7 @@ def constraints_no_shorting(stocks):
             lower_bound = np.array(upper_bound)
     return upper_bound
 
+
 # define risk free rate and gets user input
 def rf():
     rf = st.number_input("Risk Free Rate", value=0.02, min_value=0.0, max_value=2.0, step=0.01, help="The risk-free "
@@ -196,6 +210,7 @@ def rf():
                                                                                                      "risk free "
                                                                                                      "rate.")
     return rf
+
 
 # in this function the user selects constraints = yes and (short = no or yes)
 # checks if user wants to short and adds constraints
@@ -278,6 +293,7 @@ def ef(riskfree, mu, cov, data, lower_constraints=None, constrains_upper=None):
     st.pyplot(g)
     st.caption('Any Portfolio above the efficient frontier cannot exist')
 
+
 # in this function the user selects constraints = no and (short = no or yes)
 # checks if user wants to short and adds constraints
 # in this function the user selected no constraints but can short or long
@@ -350,31 +366,98 @@ def ef_no_bounds(riskfree, mu, cov, short, data):
     st.pyplot(g)
     st.caption('Any Portfolio above the efficient frontier cannot exist')
 
+
 # function plots the returns of stocks
+# mathlablib version of daily returns
+# @st.experimental_memo
+# def plot_returns(data):
+#     plt.figure(figsize=(14, 7))
+#     for c in data.columns.values:
+#         sn.lineplot(x=data.index, y=data[c], data=data, label=c)
+#     plt.ylabel('Price in $', fontsize=20)
+#     plt.xlabel('Date ', fontsize=20)
+#     plt.legend(loc='upper left')
+#     plt.xticks(np.arange(0, len(data.index), step=60), rotation=-75)
+#     plt.title('Daily Returns', fontsize=20)
+
 @st.experimental_memo
-def plot_returns(data):
-    plt.figure(figsize=(14, 7))
-    for c in data.columns.values:
-        sn.lineplot(x=data.index, y=data[c], data=data, label=c)
-    plt.ylabel('Price in $', fontsize=20)
-    plt.xlabel('Date ', fontsize=20)
-    plt.legend(loc='upper left')
-    plt.xticks(np.arange(0, len(data.index), step=60), rotation=-75)
-    plt.title('Daily Returns', fontsize=20)
+def daily_ret_plot(data):
+    fig = go.Figure()
+    color_discrete_sequence = px.colors.qualitative.D3
+    for c in data.columns:
+        fig.add_trace(go.Scatter(x=data.index, y=data[c], mode='lines', name=c, ))
+    fig.update_layout(
+        xaxis=dict(
+            showline=True, showgrid=False, showticklabels=True,
+            tickfont=dict(family='Ariel', size=13),
+            tickangle=70
+        ),
+        plot_bgcolor='white',
+        margin=dict(autoexpand=True, l=10, r=10, t=40),
+        xaxis_title='Date', yaxis_title='Price in $',
+        yaxis=dict(
+            showgrid=False, showline=False, zeroline=False,
+            tickfont=dict(family='Ariel', size=13)),
+        font=dict(
+            family="Ariel",
+            size=16,
+        )
+    )
+    fig.update_xaxes(
+        tickmode='linear', tick0=0, dtick='M6', tickformat='%Y-%m')
+
+    return fig
+
 
 # function plots the % returns
+# mathlablib version of percent change ret
+# @st.experimental_memo
+# def plot_returns_change(data):
+#     plt.figure(figsize=(14, 7))
+#     data1 = data.pct_change()
+#     data1.dropna(inplace=True)
+#     for c in data1.columns.values:
+#         sn.lineplot(x=data1.index, y=data1[c], data=data1, label=c)
+#     plt.ylabel('% Change', fontsize=20)
+#     plt.xlabel('Date ', fontsize=20)
+#     plt.legend(loc='upper left')
+#     plt.xticks(np.arange(0, len(data1.index), step=60), rotation=-75)
+#     plt.title('Daily Returns % Change', fontsize=20)
+
 @st.experimental_memo
-def plot_returns_change(data):
-    plt.figure(figsize=(14, 7))
-    data1 = data.pct_change()
-    data1.dropna(inplace=True)
-    for c in data1.columns.values:
-        sn.lineplot(x=data1.index, y=data1[c], data=data1, label=c)
-    plt.ylabel('% Change', fontsize=20)
-    plt.xlabel('Date ', fontsize=20)
-    plt.legend(loc='upper left')
-    plt.xticks(np.arange(0, len(data1.index), step=60), rotation=-75)
-    plt.title('Daily Returns % Change', fontsize=20)
+def percent_change_ret(data):
+    data1 = data.reset_index()
+    data2 = data.pct_change()
+    data2.dropna(inplace=True)
+    fig = go.Figure()
+    for c in data2.columns:
+        fig.add_trace(go.Scatter(x=data.index, y=data2[c], mode='lines', name=c))
+    fig.update_layout(
+        xaxis=dict(
+            showline=True, showgrid=False, showticklabels=True,
+            tickfont=dict(family='Ariel', size=13),
+            tickangle=70),
+        plot_bgcolor='white',
+        margin=dict(autoexpand=True, l=10, r=10, t=40),
+        xaxis_title='Date', yaxis_title='Price in $',
+        yaxis=dict(
+            showgrid=False, showline=False, zeroline=False,
+            tickfont=dict(family='Ariel', size=13)),
+        font=dict(
+            family="Ariel",
+            size=16,
+        )
+    )
+    fig.update_xaxes(
+        tickmode='linear', tick0=0, dtick='M6', tickformat='%Y-%m')
+    return fig
+
+
+@st.experimental_memo
+def corr_matrix(data):
+    g = sn.heatmap(data.corr(), annot=True, cmap='cividis', annot_kws={"size": 35 / np.sqrt(len(data.corr()))}, )
+    plt.tight_layout()
+
 
 # function gets dates from user and sets the default dates
 def get_dates():
@@ -389,6 +472,7 @@ def get_dates():
             print(start, end)
     return start, end
 
+
 # function plots the efficient frontier and random portfolios
 # code can be found on pyportfolioopt docs
 # plot is used when user has no constraints and can either short or go long
@@ -401,7 +485,8 @@ def ef_plt(mu, cov, riskfree, weights):
     try:
         plotting.plot_efficient_frontier(ef, ax=ax, show_assets=False, zorder=5)
     except SolverError:
-        st.markdown('### Solver error, try removing a symbol or changing weights')
+        st.warning('Graphing error,try removing a symbol or changing weights. This is a graphing bug, the '
+                   'weights above are correct')
 
     # Find the tangency portfolio
     ef_max_sharpe.max_sharpe(riskfree)
@@ -425,6 +510,7 @@ def ef_plt(mu, cov, riskfree, weights):
     ax.legend()
     plt.tight_layout()
 
+
 # function plots the efficient frontier and random portfolios
 # code can be found on pyportfolioopt docs
 # plot is used when user  HAS constraints and can either short or go long
@@ -440,7 +526,8 @@ def ef_constraints_plt(mu, cov, riskfree, lower_constraints=None, constrains_upp
     try:
         plotting.plot_efficient_frontier(ef, ax=ax, show_assets=False, zorder=5)
     except SolverError:
-        st.markdown('### Solver error, try removing a symbol or changing weights')
+        st.warning('Graphing error,try removing a symbol or changing weights. This is a graphing bug, the '
+                   'weights above are correct')
     # Find the tangency portfolio
     ef_max_sharpe.max_sharpe(riskfree)
     ret_tangent, std_tangent, _ = ef_max_sharpe.portfolio_performance()
@@ -463,10 +550,12 @@ def ef_constraints_plt(mu, cov, riskfree, lower_constraints=None, constrains_upp
     ax.legend()
     plt.tight_layout()
 
+
 # creates a csv file for user to download
 @st.experimental_memo
 def convert_df(data):
     return data.to_csv().encode('utf-8')
+
 
 # uses two methods to allocate stocks based on the users portfolio value
 # if greedy method fail use lp method
@@ -480,7 +569,7 @@ def allocation(data, weights, port_val):
     allocation = pd.DataFrame(list(allocation.items()), columns=['Stock', 'Shares'])
     return allocation, leftover
 
+
 # checks if user has in
 stocks = get_stock()
 app(stocks)
-
